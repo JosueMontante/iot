@@ -1,52 +1,89 @@
 var express = require('express');
 var bodyParser = require('body-parser');
-var path = require('path');
-var MongoClient = require('mongodb').MongoClient;
-var fs = require('fs');
-var serialport = require('serialport');
-var SerialPort = serialport.SerialPort;
-var portName = process.argv[2];
-
-
-/*var myport = new SerialPort('portName', {
-    baudRate: 9600,
-    parser: serialport.parsers.Readline("\r\n")
-});
-
-myport.on('open', onOpen);
-myport.on('data', onData);
-
-function onOpen() {
-    console.log("Open Con");
-};
-
-function onData(data) {
-    console.log("On data" + data);
-}
-*/
+var mongo = require('./modules/mongo');
 var app = express();
 
-var db;
-
-MongoClient.connect('mongodb://Josue:1234@ds117250.mlab.com:17250/iotestacionamiento', function(err, client) {
-    if (err) return console.log(err);
-    app.listen(process.env.PORT || 3000, () => {
-        console.log('listening on 3000')
-    })
-});
-
-fs.readFile('../iot/ejemplo.txt', 'utf8', function(err, data) {
-    if (err) throw err;
-    console.log(data);
-})
-app.set('views', __dirname + '/views');
-app.set('view engine', 'ejs');
-app.engine('html', require('ejs').renderFile);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(express.static('public'));
 
+app.all('/*', function(req, res, next) {
+    //CORS headers
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header('Access-Control-Allow-Methods', 'GET,POST');
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
 
 app.get('/', function(req, res) {
-    res.render('index.ejs');
+    res.json({name: 'Sensor API', version: 'v1'});
+});
+
+app.get('/sensors/', async function(req, res) {
+    try {
+        const response = await mongo.find('Sensor', {}, {});
+        res.json({ response: true , message: 'Obtnener sensores exitoso', data: response});
+    } catch (e) {
+        res.json({ response: false , message: 'Error ocurrio al obtener sensores'});
+    }
+});
+
+app.post('/sensors/', async function(req, res) {
+    try {
+        const sensor = {
+            name: req.body.name,
+            serial: +req.body.serial,
+            created_at: new Date(),
+        };
+        const response = await mongo.insertOne('Sensor', sensor);
+        res.json({ response: true, message: 'Inserción de sensor exitoso'});
+    } catch (e) {
+        res.json({ response: false , message: 'Error Ocurrio al insertar'});
+    }
+});
+
+app.get('/sensors/registros/', async function(req, res) {
+    try {
+        const response = await mongo.find('Registros', {}, {});
+        res.json({ response: true , message: 'Obtnener registros de sensores exitoso', data: response});
+    } catch (e) {
+        res.json({ response: false , message: 'Error ocurrio al obtener sensores'});
+    }
+});
+
+app.get('/sensors/:id', async function(req, res) {
+    try {
+        const id = +req.params.id || 0;
+        const response = await mongo.findOne('Sensor', {serial: +id}, {});
+        res.json({ response: true , message: 'Obtnener sensors exitoso', data: response});
+    } catch (e) {
+        res.json({ response: false , message: 'Error ocurrio al obtener sensores'});
+    }
+});
+
+app.get('/sensors/:id/registros', async function(req, res) {
+    try {
+        const id = +req.params.id || 0;
+        const response = await mongo.find('Registros', {serial: +id}, {});
+        res.json({ response: true, message: 'Obtener registro de sensores exitoso', data: response});
+    } catch (e) {
+        res.json({ response: false , message: 'Error ocurrio al obtener los registros de un sensor'});
+    }
+});
+
+app.post('/sensors/:id/registros', async function(req, res) {
+    try {
+        const registro = {
+            serial: +req.params.id,
+            valor: +req.body.valor,
+            created_at: new Date(),
+        };
+        const response = await mongo.insertOne('Registros', registro);
+        res.json({ response: true, message: 'Inserción de registro de sensor exitoso'});
+    } catch (e) {
+        res.json({ response: false , message: 'Error ocurrio al insertar registro de un sensor'});
+    }
+});
+
+app.listen(process.env.PORT || 3000, () => {
+    console.log('listening');
 });
